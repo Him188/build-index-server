@@ -13,5 +13,8 @@ fun Application.configureExceptionHandling() {
         exception<IllegalArgumentException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, cause.message ?: "")
         }
+        exception<PermissionDeniedException> { call, cause ->
+            call.respond(HttpStatusCode.Forbidden, cause.message ?: "")
+        }
     }
 }

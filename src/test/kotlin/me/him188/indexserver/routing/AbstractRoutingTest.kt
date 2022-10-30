@@ -48,7 +48,7 @@ abstract class AbstractRoutingTest {
         testAction(provider)
     }
 
-    protected open suspend fun ApplicationTestBuilder.configureApplication() {
+    context(ApplicationTestBuilder) protected open suspend fun configureApplication() {
 
     }
 

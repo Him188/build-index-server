@@ -17,17 +17,14 @@ import kotlinx.datetime.toInstant
 import kotlinx.serialization.json.Json
 import me.him188.indexserver.SimpleUserAuthenticator
 import me.him188.indexserver.configureSecurity
-import me.him188.indexserver.dto.Branch
-import me.him188.indexserver.dto.Index
-import me.him188.indexserver.dto.Module
-import me.him188.indexserver.dto.NextIndexResp
-import me.him188.indexserver.storage.Indexes
+import me.him188.indexserver.dto.*
+import me.him188.indexserver.storage.*
 import me.him188.indexserver.storage.Queries.createBranch
 import me.him188.indexserver.storage.Queries.createModule
 import me.him188.indexserver.storage.Queries.createUser
 import me.him188.indexserver.storage.Queries.getBranches
-import me.him188.indexserver.storage.toBranch
-import me.him188.indexserver.storage.toIndex
+import me.him188.indexserver.storage.Queries.grantPermission
+import me.him188.indexserver.storage.Queries.grantPermissions
 import org.jetbrains.exposed.sql.select
 import java.util.*
 import kotlin.random.Random
@@ -39,11 +36,15 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
 class IndexesKtTest : AbstractRoutingTest() {
-    override suspend fun ApplicationTestBuilder.configureApplication() {
+    lateinit var testUserId: UUID
+
+    context(ApplicationTestBuilder) override suspend fun configureApplication() {
+        super.configureApplication()
         runTransaction {
-            createUser(clientCredentials.username, clientCredentials.password)
+            testUserId = createUser(clientCredentials.username, clientCredentials.password)!!
         }
         application {
+            configureExceptionHandling()
             configureSecurity(SimpleUserAuthenticator(db))
             install(ContentNegotiation) {
                 json(Json {
@@ -62,27 +63,31 @@ class IndexesKtTest : AbstractRoutingTest() {
         }
     }
 
-    private fun HttpResponse.assertStatus(status: HttpStatusCode) {
-        assertEquals(status, this.status)
+    private suspend fun HttpResponse.assertStatus(status: HttpStatusCode) {
+        assertEquals(status, this.status, this.bodyAsText().ifEmpty { this.status.toString() })
     }
 
     @Test
     fun testGetWhoami() = testApplication {
         runTransaction {
             val module: UUID = createModule("test")!!
-            createBranch(module, "dev")
+            createBranch(module, "dev")!!
         }
         client.get("/v1/whoami").apply {
             assertStatus(OK)
-            assertEquals(clientCredentials.username, bodyAsText())
+            body<User>().run {
+                assertEquals(clientCredentials.username, username)
+                assertEquals(testUserId, id)
+            }
         }
     }
 
     @Test
-    fun testGetApplications() = testApplication {
+    fun testGetModules() = testApplication {
         runTransaction {
             val module: UUID = createModule("test")!!
             createBranch(module, "dev")
+            grantPermission(testUserId, composeSinglePermission { root.moduleList() })!!
         }
         client.get("/v1/modules").run {
             assertStatus(OK)
@@ -100,6 +105,7 @@ class IndexesKtTest : AbstractRoutingTest() {
         runTransaction {
             testModuleId = createModule(testModuleName)!!
             testBranchId = createBranch(testModuleId, testBranchName)!!
+            grantPermission(testUserId, composeSinglePermission { module(testModuleName).branchList() })!!
         }
         client.get("/v1/$testModuleName/branches") {
         }.apply {
@@ -120,6 +126,7 @@ class IndexesKtTest : AbstractRoutingTest() {
         val testModuleName = "test"
         runTransaction {
             testModuleId = createModule(testModuleName)!!
+            grantPermission(testUserId, composeSinglePermission { module(testModuleName).branchCreate() })!!
         }
         client.put("/v1/$testModuleName/$testBranchName") {
         }.apply {
@@ -144,6 +151,10 @@ class IndexesKtTest : AbstractRoutingTest() {
         runTransaction {
             testModuleId = createModule(testModuleName)!!
             createBranch(testModuleId, testBranchName)!!
+            grantPermission(
+                testUserId,
+                composeSinglePermission { module(testModuleName).branch(testBranchName).indexLatest() }
+            )!!
         }
         client.get("/v1/$testModuleName/$testBranchName/indexes/latest").apply {
             assertStatus(NoContent)
@@ -160,6 +171,10 @@ class IndexesKtTest : AbstractRoutingTest() {
         runTransaction {
             testModuleId = createModule(testModuleName)!!
             testBranchId = createBranch(testModuleId, testBranchName)!!
+            grantPermission(
+                testUserId,
+                composeSinglePermission { module(testModuleName).branch(testBranchName).indexNext() }
+            )!!
         }
 
         client.post("/v1/$testModuleName/$testBranchName/indexes/next") {
@@ -187,7 +202,7 @@ class IndexesKtTest : AbstractRoutingTest() {
     }
 
     @Test
-    fun testGetIndexesLatestOK() = testApplication {
+    fun testPostIndexesNextOK() = testApplication {
         val testModuleId: UUID
         val testBranchId: UUID
         val testBranchName = "dev"
@@ -196,6 +211,10 @@ class IndexesKtTest : AbstractRoutingTest() {
         runTransaction {
             testModuleId = createModule(testModuleName)!!
             testBranchId = createBranch(testModuleId, testBranchName)!!
+            grantPermissions(
+                testUserId,
+                composePermissions { module(testModuleName).branch(testBranchName).indexNext().indexLatest() }
+            ).run { assertEquals(2, size) }
         }
 
         val testIndexId: UUID

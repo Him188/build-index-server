@@ -17,11 +17,11 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import me.him188.indexserver.LOGIN_AUTHENTICATION
-import me.him188.indexserver.dto.Branch
+import me.him188.indexserver.dto.*
 import me.him188.indexserver.dto.Index
-import me.him188.indexserver.dto.Module
-import me.him188.indexserver.dto.NextIndexResp
 import me.him188.indexserver.storage.*
+import me.him188.indexserver.userId
+import me.him188.indexserver.uuidPrincipal
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inSubQuery
 import java.util.*
@@ -47,7 +47,7 @@ fun Application.configureRouting(db: Database): Routing = routing {
     }
 }
 
-private fun Route.routingVersion1(db: Database) {
+private fun Route.routingVersion1(db: Database) = with(DatabaseContext(db)) {
     /**
      * @throws Unauthorized if not authenticated
      */
@@ -58,9 +58,30 @@ private fun Route.routingVersion1(db: Database) {
          * Gets list of modules
          * @return [OK] with [List] of [Module]s
          */
-        get("modules") {
-            val result: List<Module> = runTransaction(db) { Queries.getModules().map { it.toApplication() } }
-            call.respondOK(result)
+        route("modules") {
+            get {
+                call.checkPermission(ModulePermission.MODULE_LIST)
+                val result: List<Module> = runTransaction(db) { Queries.getModules().map { it.toApplication() } }
+                call.respondOK(result)
+            }
+        }
+
+        /**
+         * Creates a new module
+         */
+        put("{module}") {
+            call.checkPermission(ModulePermission.MODULE_CREATE)
+            val module: String by call.parameters
+            val result: UUID? = runTransaction(db) {
+                Modules.insertIgnoreAndGetId {
+                    it[name] = module
+                }?.value
+            }
+            if (result == null) {
+                call.respond(Conflict)
+            } else {
+                call.respondOK(result)
+            }
         }
 
         /**
@@ -68,6 +89,7 @@ private fun Route.routingVersion1(db: Database) {
          * @return [OK] with [List] of [Branch]es
          */
         get("{module}/branches") {
+            call.checkPermission(BranchPermission.BRANCH_LIST)
             val module: String by call.parameters
             val result: List<Branch> = runTransaction(db) {
                 Queries.getBranches(module).map { it.toBranch() }
@@ -81,6 +103,7 @@ private fun Route.routingVersion1(db: Database) {
          * @return [Created] with [Branch]; or [Conflict] if module with given name already exists.
          */
         put("{module}/{branch}") {
+            call.checkPermission(BranchPermission.BRANCH_CREATE)
             val module: String by call.parameters
             val branch: String by call.parameters
             val moduleId: UUID
@@ -110,6 +133,7 @@ private fun Route.routingVersion1(db: Database) {
              * @return [OK] with [List] of [Index].
              */
             get {
+                call.checkPermission(IndexPermission.INDEX_LIST)
                 val result: List<Index> = runTransaction(db) {
                     queryIndexesInFilter(call.parameters).map { it.toIndex() }
                 }
@@ -122,6 +146,7 @@ private fun Route.routingVersion1(db: Database) {
              * @return [OK] with [Int] — number of indexes deleted
              */
             delete {
+                call.checkPermission(IndexPermission.INDEX_DELETE)
                 val result: Int = runTransaction(db) {
                     Indexes.deleteIgnoreWhere {
                         id inSubQuery queryIndexesInFilter(call.parameters)
@@ -136,6 +161,7 @@ private fun Route.routingVersion1(db: Database) {
              * @return [OK] with [Index]; [NoContent] if the branch is new; or [NotFound] if module + branch are invalid.
              */
             get("latest") {
+                call.checkPermission(IndexPermission.INDEX_LATEST)
                 val module: String by call.parameters
                 val branch: String by call.parameters
 
@@ -189,6 +215,8 @@ private fun Route.routingVersion1(db: Database) {
              * @return [OK] with [NextIndexResp]; or [NotFound] if `module` and `branch` provided are invalid.
              */
             post("next") {
+                call.checkPermission(IndexPermission.INDEX_NEXT)
+
                 val module: String by call.parameters
                 val branchName: String = call.parameters.getOrFail("branch")
                 val commitRef: String by call.parameters
@@ -251,6 +279,7 @@ private fun Route.routingVersion1(db: Database) {
                  * Gets information about this index.
                  */
                 get {
+                    call.checkPermission(IndexPermission.INDEX_READ)
                     val module: String by call.parameters
                     val branch: String by call.parameters
                     val index: UInt by call.parameters
@@ -267,6 +296,7 @@ private fun Route.routingVersion1(db: Database) {
                  * Delete this index
                  */
                 delete {
+                    call.checkPermission(IndexPermission.INDEX_DELETE)
                     val module: String by call.parameters
                     val branch: String by call.parameters
                     val req: UInt by call.parameters
@@ -283,6 +313,8 @@ private fun Route.routingVersion1(db: Database) {
 }
 
 class NoMatchingBranchException : NoSuchElementException("Invalid module and/or branch")
+class PermissionDeniedException(permission: String) :
+    IllegalStateException("Permission denied. Required permission token: '$permission'")
 
 fun LocalDateTime.Companion.now(timeZone: TimeZone = TimeZone.currentSystemDefault()): LocalDateTime =
     Clock.System.now().toLocalDateTime(timeZone)
@@ -290,11 +322,11 @@ fun LocalDateTime.Companion.now(timeZone: TimeZone = TimeZone.currentSystemDefau
 private fun Route.users() {
     /**
      * Gets authenticated username
-     * @return [OK] with [String] — your username
+     * @return [OK] with [User]
      */
     get("whoami") {
-        val principal = call.principal<UserIdPrincipal>()!!
-        call.respondText(principal.name)
+        val principal = call.authentication.uuidPrincipal
+        call.respondOK(User(principal.uuid, principal.username))
     }
 }
 
@@ -372,4 +404,42 @@ private suspend inline fun <reified T : Any> ApplicationCall.respondOkOrNoConten
 
 private suspend inline fun <reified T : Any> ApplicationCall.respondOK(content: T) {
     return respond(OK, content)
+}
+
+
+class DatabaseContext(
+    val db: Database
+)
+
+/**
+ * @throws PermissionDeniedException
+ */
+context (DatabaseContext) suspend fun ApplicationCall.checkPermission(permission: PermissionToken) {
+    val module: String by parameters
+    val branch: String by parameters
+
+    val id = authentication.userId
+    val permissionStr = composeSinglePermission {
+        when (permission) {
+            is IndexPermission -> {
+                module(module).branch(branch).token(permission)
+            }
+            is BranchPermission -> {
+                module(module).token(permission)
+            }
+            is ModulePermission -> {
+                root.token(permission)
+            }
+        }
+    }
+    runTransaction(db) {
+        val result = testPermission(
+            filterUser = { Users.id eq id },
+            permission = permissionStr
+        )
+
+        if (!result) {
+            throw PermissionDeniedException(permissionStr)
+        }
+    }
 }

@@ -1,27 +1,28 @@
 package me.him188.indexserver.storage
 
+import me.him188.indexserver.notEmpty
 import org.jetbrains.exposed.dao.id.UUIDTable
-import org.jetbrains.exposed.sql.ReferenceOption
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.*
 
 object Users : UUIDTable() {
     val username = varchar("username", 64).uniqueIndex()
     val password = binary("password", 16)
 }
 
-enum class OperationPermissions {
-    READ_INDEX,
-    WRITE_INDEX,
-}
-
-object UserPermissions : Table() {
+object UserPermissions : UUIDTable() {
     val userId = reference("userId", Users.id, onDelete = ReferenceOption.CASCADE)
-    val permission = enumeration<OperationPermissions>("permission")
+    val permission = varchar("permission", 150)
 
     init {
         uniqueIndex(userId, permission)
     }
-
-    override val primaryKey: PrimaryKey = PrimaryKey(userId, permission)
 }
 
+context(Transaction) inline fun testPermission(
+    filterUser: SqlExpressionBuilder.() -> Op<Boolean>,
+    permission: String
+): Boolean {
+    return (Users crossJoin UserPermissions).select {
+        filterUser() and (UserPermissions.permission eq permission)
+    }.notEmpty()
+}

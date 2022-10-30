@@ -9,6 +9,7 @@ import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.default
 import kotlinx.serialization.json.Json
+import me.him188.indexserver.routing.configureExceptionHandling
 import me.him188.indexserver.routing.configureRouting
 import me.him188.indexserver.storage.Branches
 import me.him188.indexserver.storage.Modules
@@ -42,6 +43,7 @@ object IndexServerApplication {
         initializeDatabase(db)
 
         embeddedServer(Netty, port = port, host = host) {
+            configureExceptionHandling()
             configureSecurity(SimpleUserAuthenticator(db))
             install(ContentNegotiation) {
                 json(Json {

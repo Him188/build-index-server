@@ -35,6 +35,22 @@ object Queries {
         }?.value
 
     context(Transaction)
+    fun grantPermission(userId: UUID, permission: Permission): UUID? {
+        return UserPermissions.insertIgnoreAndGetId {
+            it[UserPermissions.userId] = userId
+            it[UserPermissions.permission] = permission
+        }?.value
+    }
+
+    context(Transaction)
+    fun grantPermissions(userId: UUID, permissions: Set<Permission>): Set<UUID> {
+        return UserPermissions.batchInsert(permissions, ignore = true, shouldReturnGeneratedValues = false) {
+            set(UserPermissions.userId, userId)
+            set(UserPermissions.permission, it)
+        }.mapTo(mutableSetOf()) { it[UserPermissions.id].value }
+    }
+
+    context(Transaction)
     fun createUser(username: String, password: String): UUID? =
         Users.insertIgnoreAndGetId {
             it[Users.username] = username
