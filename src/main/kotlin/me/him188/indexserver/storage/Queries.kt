@@ -4,6 +4,7 @@ import me.him188.indexserver.UserPasswordEncryption
 import me.him188.indexserver.dto.Branch
 import me.him188.indexserver.dto.Index
 import me.him188.indexserver.dto.Module
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.*
 import java.util.*
 
@@ -21,7 +22,7 @@ object Queries {
         Modules.select { Modules.name eq moduleName }.limit(1).firstOrNull()
 
     context(Transaction)
-    fun createApplication(name: String): UUID? =
+    fun createModule(name: String): UUID? =
         Modules.insertIgnoreAndGetId {
             it[Modules.name] = name
         }?.value
@@ -41,10 +42,14 @@ object Queries {
         }?.value
 
     context(Transaction)
-    fun getLatestIndex(moduleName: String, branch: String): UInt? =
+    fun getLatestIndexId(moduleName: String, branch: String): EntityID<UUID>? =
+        getBranch(moduleName, branch)?.get(Branches.latestIndexId)
+
+    context(Transaction)
+    fun getBranch(moduleName: String, branch: String): ResultRow? =
         (Modules crossJoin Branches).select {
             (Modules.name eq moduleName) and (Branches.name eq branch)
-        }.firstOrNull()?.get(Branches.latestIndexValue)
+        }.firstOrNull()
 
     context(Transaction)
     fun getBranchIndexes(moduleName: String, branch: String): Query =
@@ -53,12 +58,12 @@ object Queries {
         }
 
     context(Transaction)
-    fun setLatestIndex(moduleName: String, branch: String, newIndex: UInt) =
+    fun setLatestIndex(moduleName: String, branch: String, newIndex: UUID) =
         (Modules crossJoin Branches).update(
             where = { (Modules.name eq moduleName) and (Branches.name eq branch) },
             limit = 1
         ) {
-            it[Branches.latestIndexValue] = newIndex
+            it[Branches.latestIndexId] = newIndex
         } == 1
 }
 
@@ -67,7 +72,7 @@ fun ResultRow.toBranch(): Branch {
         id = get(Branches.id).value,
         moduleId = get(Modules.id).value,
         name = get(Branches.name),
-        latestIndex = get(Branches.latestIndexValue),
+        latestIndexId = get(Branches.latestIndexId)?.value,
     )
 }
 
@@ -84,7 +89,7 @@ fun ResultRow.toIndex(): Index {
             id = get(id).value,
             branchId = get(branchId).value,
             commitRef = get(commitRef),
-            index = get(value),
+            value = get(value),
             date = get(date),
         )
     }

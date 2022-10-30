@@ -9,7 +9,7 @@ import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.default
 import kotlinx.serialization.json.Json
-import me.him188.indexserver.routing.configureIndexesRouting
+import me.him188.indexserver.routing.configureRouting
 import me.him188.indexserver.storage.Branches
 import me.him188.indexserver.storage.Modules
 import me.him188.indexserver.storage.UserPermissions
@@ -48,7 +48,7 @@ object IndexServerApplication {
                     ignoreUnknownKeys = true
                 })
             }
-            configureIndexesRouting(db)
+            configureRouting(db)
         }.start(wait = true)
     }
 

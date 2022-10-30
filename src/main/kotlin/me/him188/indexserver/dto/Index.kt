@@ -12,7 +12,7 @@ data class Index(
     val id: UUID,
     val branchId: UUID,
     val commitRef: String,
-    val index: UInt,
+    val value: UInt,
     val date: LocalDateTime
 ) {
     init {

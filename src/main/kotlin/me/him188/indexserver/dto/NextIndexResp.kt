@@ -7,9 +7,10 @@ import kotlinx.serialization.UseSerializers
 import java.util.*
 
 @Serializable
-data class Branch(
-    val id: UUID,
+data class NextIndexResp(
     val moduleId: UUID,
-    val name: String,
-    val latestIndexId: UUID?,
+    val branchId: UUID,
+    val previousIndexId: UUID?,
+    val previousIndexValue: UInt?,
+    val newIndex: Index
 )

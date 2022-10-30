@@ -1,6 +1,7 @@
 package me.him188.indexserver.storage
 
 import org.jetbrains.exposed.dao.id.UUIDTable
+import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.kotlin.datetime.datetime
 
 object Modules : UUIDTable("Modules") {
@@ -10,7 +11,8 @@ object Modules : UUIDTable("Modules") {
 object Branches : UUIDTable("Branches") {
     val moduleId = reference("moduleId", Modules.id)
     val name = varchar("name", 64)
-    val latestIndexValue = uinteger("latestIndexValue").nullable().default(null)
+    val latestIndexId = reference("latestIndexId", Indexes.id, onDelete = ReferenceOption.RESTRICT)
+        .nullable().default(null)
 
     init {
         uniqueIndex(moduleId, name)
