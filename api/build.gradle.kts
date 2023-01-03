@@ -36,4 +36,5 @@ mavenCentralPublish {
     group = "me.him188.buildindex"
 
     singleDevGithubProject("Him188", "build-index-server")
+    licenseApacheV2()
 }
