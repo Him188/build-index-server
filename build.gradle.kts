@@ -63,6 +63,11 @@ dependencies {
     implementation("org.jetbrains.exposed", "exposed-jdbc")
     implementation("org.jetbrains.exposed", "exposed-kotlin-datetime")
 
+    val jline = "3.21.0"
+    implementation("org.jline:jline-terminal:$jline")
+    implementation("org.jline:jline-terminal-jansi:$jline")
+    implementation("org.jline:jline-reader:$jline")
+
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine")

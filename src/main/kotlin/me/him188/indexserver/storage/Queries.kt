@@ -4,6 +4,7 @@ import me.him188.indexserver.UserPasswordEncryption
 import me.him188.indexserver.dto.Branch
 import me.him188.indexserver.dto.Index
 import me.him188.indexserver.dto.Module
+import me.him188.indexserver.dto.User
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.*
 import java.util.*
@@ -89,6 +90,13 @@ fun ResultRow.toBranch(): Branch {
         moduleId = get(Modules.id).value,
         name = get(Branches.name),
         latestIndexId = get(Branches.latestIndexId)?.value,
+    )
+}
+
+fun ResultRow.toUser(): User {
+    return User(
+        id = get(Users.id).value,
+        username = get(Users.username),
     )
 }
 

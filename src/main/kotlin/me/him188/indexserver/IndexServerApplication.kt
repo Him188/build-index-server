@@ -8,16 +8,25 @@ import io.ktor.server.plugins.contentnegotiation.*
 import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.default
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.trySendBlocking
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.serialization.json.Json
+import me.him188.indexserver.cli.Command
+import me.him188.indexserver.cli.CommandManager
+import me.him188.indexserver.cli.CommandManagerImpl
 import me.him188.indexserver.routing.configureExceptionHandling
 import me.him188.indexserver.routing.configureRouting
-import me.him188.indexserver.storage.Branches
-import me.him188.indexserver.storage.Modules
-import me.him188.indexserver.storage.UserPermissions
-import me.him188.indexserver.storage.Users
-import org.jetbrains.exposed.sql.Database
+import me.him188.indexserver.storage.*
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SchemaUtils.createMissingTablesAndColumns
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jline.reader.LineReaderBuilder
+import org.jline.terminal.Terminal
+import org.jline.terminal.TerminalBuilder
+import kotlin.concurrent.thread
 
 object IndexServerApplication {
     @JvmStatic
@@ -36,22 +45,91 @@ object IndexServerApplication {
 //        val dbPassword by parser.option(ArgType.String, "dbpass", description = "Password for database").default("")
 
         parser.parse(args)
+        start(workingDir, port, host)
+    }
+
+    private fun start(workingDir: String, port: Int, host: String) {
+        val appScope = CoroutineScope(CoroutineName("IndexServerApplication") + SupervisorJob())
 
         // h2jdbc:h2:mem:test
         val db =
             Database.connect("jdbc:h2:$workingDir/db;MODE=MYSQL", driver = "org.h2.Driver", user = "", password = "")
         initializeDatabase(db)
 
-        embeddedServer(Netty, port = port, host = host) {
-            configureExceptionHandling()
-            configureSecurity(SimpleUserAuthenticator(db))
-            install(ContentNegotiation) {
-                json(Json {
-                    ignoreUnknownKeys = true
-                })
+        val server = embeddedServer(Netty, port = port, host = host, module = { indexServerApplicationModule(db) })
+
+        val commandManager = CommandManagerImpl()
+
+        registerCommands(db, commandManager)
+
+
+        val terminal: Terminal = TerminalBuilder.builder().jansi(true).build()
+        val lineReader = LineReaderBuilder.builder()
+            .terminal(terminal)
+            //            .completer(MyCompleter())
+            //            .highlighter(MyHighlighter())
+            //            .parser(MyParser())
+            .build()
+
+        val commandExecutor: Channel<String> = Channel()
+
+        thread {
+            while (true) {
+                val line = lineReader.readLine()
+                commandExecutor.trySendBlocking(line)
+                    .exceptionOrNull()?.printStackTrace()
             }
-            configureRouting(db)
-        }.start(wait = true)
+        }
+
+        appScope.launch {
+            while (isActive) {
+                commandExecutor.receiveAsFlow().collect { line ->
+                    try {
+                        commandManager.executeCommandLine(line)
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+
+        server.start(true)
+        appScope.cancel()
+    }
+
+    private fun registerCommands(db: Database, commandManager: CommandManager) {
+        commandManager.register(Command("grant", "Grant permission") { (username, perm) ->
+            val user = runTransaction(db) { Users.select { Users.username eq username }.singleOrNull()?.toUser() }
+                ?: throw IllegalArgumentException("User '$username' not found.")
+
+            val count = runTransaction(db) {
+                UserPermissions.insert {
+                    it[userId] = user.id
+                    it[permission] = perm
+                }.insertedCount
+            }
+
+            if (count == 1) {
+                echo("Successfully granted '$username' with '$perm'.")
+            } else {
+                echo("Failed granting permission. Possibly '$username' is already granted with '$perm'.")
+            }
+        })
+
+        commandManager.register(Command("revoke", "Revoke permission") { (username, perm) ->
+            val user = runTransaction(db) { Users.select { Users.username eq username }.singleOrNull()?.toUser() }
+                ?: throw IllegalArgumentException("User '$username' not found.")
+
+            val count = runTransaction(db) {
+                UserPermissions.deleteWhere(1) { (userId eq user.id) and (permission eq perm) }
+            }
+
+            if (count == 1) {
+                echo("Successfully revoked '$perm' with '$username'.")
+            } else {
+                echo("Failed revoking permission. Possibly '$username' is not yet granted with '$perm'.")
+            }
+        })
     }
 
     fun initializeDatabase(db: Database) {
@@ -61,3 +139,13 @@ object IndexServerApplication {
     }
 }
 
+fun Application.indexServerApplicationModule(db: Database) {
+    configureExceptionHandling()
+    configureSecurity(SimpleUserAuthenticator(db))
+    install(ContentNegotiation) {
+        json(Json {
+            ignoreUnknownKeys = true
+        })
+    }
+    configureRouting(db)
+}
