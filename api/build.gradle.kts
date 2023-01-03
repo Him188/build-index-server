@@ -1,9 +1,9 @@
 @Suppress("DSL_SCOPE_VIOLATION")
 plugins {
-    application
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktor)
+    alias(libs.plugins.maven.central.publish)
 }
 
 kotlin {
@@ -28,4 +28,12 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)
     testImplementation(libs.kotlin.test.junit5)
+}
+
+mavenCentralPublish {
+    useCentralS01()
+    artifactId = "build-index-api"
+    group = "me.him188.buildindex"
+
+    singleDevGithubProject("Him188", "build-index-server")
 }

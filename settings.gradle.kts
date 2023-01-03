@@ -57,6 +57,7 @@ dependencyResolutionManagement.versionCatalogs.create("libs") {
     plugin("kotlin-jvm", "org.jetbrains.kotlin.jvm").versionRef(kotlin)
     plugin("kotlin-serialization", "org.jetbrains.kotlin.plugin.serialization").versionRef(kotlin)
     plugin("ktor", "io.ktor.plugin").versionRef(ktor)
+    plugin("maven-central-publish", "me.him188.maven-central-publish").version("1.0.0")
 }
 
 
