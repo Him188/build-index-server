@@ -25,6 +25,7 @@ tasks.withType(Test::class.java) {
 }
 repositories {
     mavenCentral()
+    maven { url = uri("https://jitpack.io") }
 }
 
 kotlin.sourceSets.all {
@@ -42,8 +43,10 @@ dependencies {
     implementation("io.ktor:ktor-server-html-builder")
     implementation("io.ktor:ktor-server-netty-jvm")
     implementation("io.ktor:ktor-server-status-pages")
-    implementation("io.ktor:ktor-server-host-common-jvm:2.1.2")
-    implementation("io.ktor:ktor-server-status-pages-jvm:2.1.2")
+    implementation("io.ktor:ktor-server-host-common-jvm")
+    implementation("io.ktor:ktor-server-status-pages-jvm")
+//    implementation("io.ktor:ktor-server-openapi")
+//    implementation("io.ktor:ktor-server-swagger")
     testImplementation("io.ktor:ktor-client-content-negotiation")
     testImplementation("io.ktor:ktor-serialization-kotlinx-json")
     testImplementation("io.ktor:ktor-client-auth")

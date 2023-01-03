@@ -424,9 +424,11 @@ context (DatabaseContext) suspend fun ApplicationCall.checkPermission(permission
             is IndexPermission -> {
                 module(module).branch(branch).token(permission)
             }
+
             is BranchPermission -> {
                 module(module).token(permission)
             }
+
             is ModulePermission -> {
                 root.token(permission)
             }
