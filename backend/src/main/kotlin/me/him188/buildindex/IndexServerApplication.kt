@@ -26,6 +26,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jline.reader.LineReaderBuilder
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
+import java.io.File
 import kotlin.concurrent.thread
 
 object IndexServerApplication {
@@ -44,6 +45,7 @@ object IndexServerApplication {
 //        val dbUser by parser.option(ArgType.String, "dbuser", description = "User for database").default("")
 //        val dbPassword by parser.option(ArgType.String, "dbpass", description = "Password for database").default("")
 
+        File(workingDir).mkdirs()
         parser.parse(args)
         start(workingDir, port, host)
     }
