@@ -34,6 +34,8 @@ import kotlin.system.exitProcess
 object IndexServerApplication {
     @JvmStatic
     fun main(args: Array<String>) {
+        println("Welcome Build Index Server")
+
         val parser = ArgParser("IndexServer", useDefaultHelpShortName = false)
 
         val host by parser.option(ArgType.String, "host", "h", "Listen hostname").default("0.0.0.0")
@@ -47,6 +49,7 @@ object IndexServerApplication {
 //        val dbUser by parser.option(ArgType.String, "dbuser", description = "User for database").default("")
 //        val dbPassword by parser.option(ArgType.String, "dbpass", description = "Password for database").default("")
 
+        println("Starting Build Index Server")
         File(workingDir).mkdirs()
         parser.parse(args)
         start(workingDir, port, host)
