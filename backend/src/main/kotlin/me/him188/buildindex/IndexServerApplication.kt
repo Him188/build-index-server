@@ -24,10 +24,12 @@ import org.jetbrains.exposed.sql.SchemaUtils.createMissingTablesAndColumns
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jline.reader.LineReaderBuilder
+import org.jline.reader.UserInterruptException
 import org.jline.terminal.Terminal
 import org.jline.terminal.TerminalBuilder
 import java.io.File
 import kotlin.concurrent.thread
+import kotlin.system.exitProcess
 
 object IndexServerApplication {
     @JvmStatic
@@ -77,7 +79,11 @@ object IndexServerApplication {
 
         thread {
             while (true) {
-                val line = lineReader.readLine()
+                val line = try {
+                    lineReader.readLine()
+                } catch (e: UserInterruptException) {
+                    exitProcess(0)
+                }
                 commandExecutor.trySendBlocking(line)
                     .exceptionOrNull()?.printStackTrace()
             }
