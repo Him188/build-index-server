@@ -49,6 +49,31 @@ fun Application.configureRouting(db: Database): Routing = routing {
 
 private fun Route.routingVersion1(db: Database) = with(DatabaseContext(db)) {
     /**
+     * Gets the latest index
+     * @return [OK] with [Index]; [NoContent] if the branch is new; or [NotFound] if module + branch are invalid.
+     */
+    get("{module}/{branch}/indexes/latest") {
+//                call.checkPermission(IndexPermission.INDEX_LATEST)
+        val module: String by call.parameters
+        val branch: String by call.parameters
+
+        val index = runTransaction(db) {
+            val index = Queries.getLatestIndexId(module, branch)?.value
+            if (index != null) {
+                (Modules crossJoin Branches crossJoin Indexes).select {
+                    (Modules.name eq module)
+                        .and(Branches.name eq branch)
+                        .and(Indexes.id eq index)
+                }.firstOrNull()?.toIndex()
+            } else {
+                null
+            }
+        }
+
+        call.respondOkOrNoContent(index)
+    }
+
+    /**
      * @throws Unauthorized if not authenticated
      */
     authenticate(LOGIN_AUTHENTICATION) {
@@ -155,31 +180,6 @@ private fun Route.routingVersion1(db: Database) = with(DatabaseContext(db)) {
                 }
 
                 call.respond(result)
-            }
-
-            /**
-             * Gets the latest index
-             * @return [OK] with [Index]; [NoContent] if the branch is new; or [NotFound] if module + branch are invalid.
-             */
-            get("latest") {
-                call.checkPermission(IndexPermission.INDEX_LATEST)
-                val module: String by call.parameters
-                val branch: String by call.parameters
-
-                val index = runTransaction(db) {
-                    val index = Queries.getLatestIndexId(module, branch)?.value
-                    if (index != null) {
-                        (Modules crossJoin Branches crossJoin Indexes).select {
-                            (Modules.name eq module)
-                                .and(Branches.name eq branch)
-                                .and(Indexes.id eq index)
-                        }.firstOrNull()?.toIndex()
-                    } else {
-                        null
-                    }
-                }
-
-                call.respondOkOrNoContent(index)
             }
 
 //            /**
