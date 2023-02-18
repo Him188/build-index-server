@@ -318,8 +318,8 @@ private fun Route.routingVersion1(db: Database) = with(DatabaseContext(db)) {
 }
 
 class NoMatchingBranchException : NoSuchElementException("Invalid module and/or branch")
-class PermissionDeniedException(permission: String) :
-    IllegalStateException("Permission denied. Required permission token: '$permission'")
+class PermissionDeniedException(permissions: Collection<String>) :
+    IllegalStateException("Permission denied. Required permission tokens (any of): ${permissions.joinToString { "'$it'" }}")
 
 fun LocalDateTime.Companion.now(timeZone: TimeZone = TimeZone.currentSystemDefault()): LocalDateTime =
     Clock.System.now().toLocalDateTime(timeZone)
@@ -424,14 +424,18 @@ context (DatabaseContext) suspend fun ApplicationCall.checkPermission(permission
     val branch: String by parameters
 
     val id = authentication.userId
-    val permissionStr = composeSinglePermission {
+    val permissions = composePermissions {
         when (permission) {
             is IndexPermission -> {
                 module(module).branch(branch).token(permission)
+                module(module).anyBranch().token(permission)
+                anyModule().branch(branch).token(permission)
+                anyModule().anyBranch().token(permission)
             }
 
             is BranchPermission -> {
                 module(module).token(permission)
+                anyModule().token(permission)
             }
 
             is ModulePermission -> {
@@ -442,11 +446,11 @@ context (DatabaseContext) suspend fun ApplicationCall.checkPermission(permission
     runTransaction(db) {
         val result = testPermission(
             filterUser = { Users.id eq id },
-            permission = permissionStr
+            permissions = permissions
         )
 
         if (!result) {
-            throw PermissionDeniedException(permissionStr)
+            throw PermissionDeniedException(permissions)
         }
     }
 }

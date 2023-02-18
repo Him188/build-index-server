@@ -118,8 +118,6 @@ open class PermissionBuilder(
             INDEX_READ -> indexRead()
             INDEX_NEXT -> indexNext()
             INDEX_DELETE -> indexDelete()
-            INDEX_WRITE -> indexWrite()
-            INDEX -> index()
         }
     }
 
@@ -157,12 +155,6 @@ open class PermissionBuilder(
 
     @PermissionBuilderDsl
     fun WithBranch.indexDelete(): Composed<WithBranch> = compose { addPermission(INDEX_DELETE) }
-
-    @PermissionBuilderDsl
-    fun WithBranch.indexWrite(): Composed<WithBranch> = compose { addPermission(INDEX_WRITE) }
-
-    @PermissionBuilderDsl
-    fun WithBranch.index(): Composed<WithBranch> = compose { addPermission(INDEX) }
 
 
     @PermissionBuilderDsl
@@ -220,8 +212,6 @@ class PermissionsBuilder(delegate: String = "") : PermissionBuilder(delegate) {
             INDEX_READ -> indexRead()
             INDEX_NEXT -> indexNext()
             INDEX_DELETE -> indexDelete()
-            INDEX_WRITE -> indexWrite()
-            INDEX -> index()
         }
     }
 
@@ -259,12 +249,6 @@ class PermissionsBuilder(delegate: String = "") : PermissionBuilder(delegate) {
 
     @PermissionBuilderDsl
     fun Composed<WithBranch>.indexDelete(): Composed<WithBranch> = compose { addPermission(INDEX_DELETE) }
-
-    @PermissionBuilderDsl
-    fun Composed<WithBranch>.indexWrite(): Composed<WithBranch> = compose { addPermission(INDEX_WRITE) }
-
-    @PermissionBuilderDsl
-    fun Composed<WithBranch>.index(): Composed<WithBranch> = compose { addPermission(INDEX) }
 
 
     @PermissionBuilderDsl
@@ -335,13 +319,10 @@ enum class IndexPermission(
 ) : PermissionToken {
     INDEX_LIST("index-list"),
     INDEX_LATEST("index-latest"),
-    INDEX_READ(INDEX_LIST, INDEX_LATEST),
+    INDEX_READ("index-read"),
 
     INDEX_NEXT("index-next"),
     INDEX_DELETE("index-delete"),
-    INDEX_WRITE(INDEX_NEXT, INDEX_DELETE),
-
-    INDEX(INDEX_READ, INDEX_WRITE),
     ;
 
     constructor(token: String) : this(includes = emptyArray(), token = token)

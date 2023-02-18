@@ -27,7 +27,6 @@ object Indexes : UUIDTable("Indexes") {
 
     init {
         uniqueIndex(branchId, id)
-        uniqueIndex(branchId, commitRef)
         uniqueIndex(branchId, value)
     }
 }

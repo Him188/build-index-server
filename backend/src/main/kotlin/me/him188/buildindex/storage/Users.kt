@@ -20,9 +20,9 @@ object UserPermissions : UUIDTable() {
 
 context(Transaction) inline fun testPermission(
     filterUser: SqlExpressionBuilder.() -> Op<Boolean>,
-    permission: String
+    permissions: Collection<String>
 ): Boolean {
     return (Users crossJoin UserPermissions).select {
-        filterUser() and (UserPermissions.permission eq permission)
+        filterUser() and (UserPermissions.permission inList permissions)
     }.notEmpty()
 }
