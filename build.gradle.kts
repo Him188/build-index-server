@@ -7,7 +7,7 @@ plugins {
 
 allprojects {
     group = "me.him188.buildindex"
-    version = "0.0.1"
+    version = "1.0.0"
 
     repositories {
         mavenCentral()
@@ -16,10 +16,11 @@ allprojects {
     afterEvaluate {
         java {
             toolchain {
-                languageVersion.set(JavaLanguageVersion.of(17))
+                languageVersion.set(JavaLanguageVersion.of(8))
             }
         }
         runCatching {
+            kotlin.jvmToolchain(8)
             kotlin.sourceSets.all {
                 languageSettings.enableLanguageFeature("ContextReceivers")
                 languageSettings.optIn("kotlin.contracts.ExperimentalContracts")
@@ -33,4 +34,8 @@ allprojects {
             this.includeEngines()
         }
     }
+}
+
+application {
+    applicationName = "build-index-server"
 }
