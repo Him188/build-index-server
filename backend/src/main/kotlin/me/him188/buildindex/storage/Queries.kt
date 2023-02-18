@@ -88,6 +88,7 @@ fun ResultRow.toBranch(): Branch {
     return Branch(
         id = get(Branches.id).value,
         moduleId = get(Modules.id).value,
+        moduleName = get(Modules.name),
         name = get(Branches.name),
         latestIndexId = get(Branches.latestIndexId)?.value,
     )

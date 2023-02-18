@@ -120,6 +120,7 @@ private fun Route.routingVersion1(db: Database) = with(DatabaseContext(db)) {
                     Created, Branch(
                         id = result,
                         moduleId = moduleId,
+                        moduleName = module,
                         name = branch,
                         latestIndexId = null,
                     )
@@ -220,6 +221,10 @@ private fun Route.routingVersion1(db: Database) = with(DatabaseContext(db)) {
                 val module: String by call.parameters
                 val branchName: String = call.parameters.getOrFail("branch")
                 val commitRef: String by call.parameters
+
+                if (commitRef.length != 40) {
+                    throw IllegalArgumentException("Invalid commit ref: '$commitRef'")
+                }
 
                 val branch: Branch
                 val newIndexId: UUID

@@ -17,6 +17,7 @@ public data class Module(
 public data class Branch(
     val id: UUID,
     val moduleId: UUID,
+    val moduleName: String,
     val name: String,
     val latestIndexId: UUID?,
 )

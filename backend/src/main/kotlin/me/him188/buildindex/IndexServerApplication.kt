@@ -123,6 +123,10 @@ object IndexServerApplication {
     }
 
     private fun registerCommands(db: Database, commandManager: CommandManager) {
+        ///////////////////////////////////////////////////////////////////////////
+        // Users
+        ///////////////////////////////////////////////////////////////////////////
+
         commandManager.register(Command("add-user", "Add a user") { (username, password) ->
             val existing = runTransaction(db) { Users.select { Users.username eq username }.singleOrNull()?.toUser() }
             if (existing != null) {
@@ -186,6 +190,10 @@ object IndexServerApplication {
             val permission: String,
         )
 
+        ///////////////////////////////////////////////////////////////////////////
+        // Permissions
+        ///////////////////////////////////////////////////////////////////////////
+
         commandManager.register(Command("list-permissions", "List permissions") { _ ->
             val list = runTransaction(db) {
                 UserPermissions.crossJoin(Users).selectAll()
@@ -228,6 +236,109 @@ object IndexServerApplication {
                 echo("Successfully revoked '$perm' with '$username'.")
             } else {
                 echo("Failed revoking permission. Possibly '$username' is not yet granted with '$perm'.")
+            }
+        })
+
+        ///////////////////////////////////////////////////////////////////////////
+        // Modules
+        ///////////////////////////////////////////////////////////////////////////
+
+        commandManager.register(Command("list-modules", "List modules") { _ ->
+            val list = runTransaction(db) {
+                Modules.selectAll().map { it[Modules.name] }
+            }
+
+            echo("Total ${list.size} modules: ")
+            list.forEachIndexed { index, item ->
+                echo("${index + 1}. $item")
+            }
+        })
+
+        commandManager.register(Command("add-module", "Add a branch") { (name) ->
+            val count = runTransaction(db) {
+                Modules.insert {
+                    it[Modules.name] = name
+                }
+            }
+
+            echo("Result: ${count.insertedCount}")
+        })
+
+        commandManager.register(Command("remove-module", "Remove a branch") { (name) ->
+            val count = runTransaction(db) {
+                Modules.deleteWhere {
+                    Modules.name eq name
+                }
+            }
+
+            echo("Result: $count")
+        })
+
+        ///////////////////////////////////////////////////////////////////////////
+        // Branches
+        ///////////////////////////////////////////////////////////////////////////
+
+        commandManager.register(Command("list-branches", "List branches") { _ ->
+            val list = runTransaction(db) {
+                Modules.crossJoin(Branches).selectAll().map { it.toBranch() }
+            }
+
+            echo("Total ${list.size} branches: ")
+            list.forEachIndexed { index, item ->
+                echo("${index + 1}. ${item.moduleName}.${item.name}")
+            }
+        })
+
+        commandManager.register(Command("add-branch", "Add a branch") { (name) ->
+            val moduleName = name.substringBefore(".")
+            val branchName = name.substringAfter(".")
+
+            echo("Add branch '$branchName' for module '$moduleName'")
+
+            val moduleId = runTransaction(db) {
+                Modules.select {
+                    Modules.name eq moduleName
+                }.map { it[Modules.id] }
+            }.singleOrNull() ?: throw IllegalArgumentException("Cannot find module '$moduleName'")
+
+            val count = runTransaction(db) {
+                Branches.insert {
+                    it[Branches.moduleId] = moduleId
+                    it[Branches.name] = branchName
+                }
+            }
+
+            echo("Result: ${count.insertedCount}")
+        })
+
+        commandManager.register(Command("delete-branch", "Delete a branch") { (name) ->
+            val moduleName = name.substringBefore(".")
+            val branchName = name.substringAfter(".")
+
+            echo("Deleting branch '$branchName' from module '$moduleName'")
+
+            val moduleId = runTransaction(db) {
+                Modules.select {
+                    Modules.name eq moduleName
+                }.map { it[Modules.id] }
+            }.singleOrNull() ?: throw IllegalArgumentException("Cannot find module '$moduleName'")
+
+            val count = runTransaction(db) {
+                Branches.deleteWhere {
+                    (Branches.moduleId eq moduleId) and (Branches.name eq branchName)
+                }
+            }
+
+            echo("Result: $count")
+        })
+
+        ///////////////////////////////////////////////////////////////////////////
+        // Others
+        ///////////////////////////////////////////////////////////////////////////
+
+        commandManager.register(Command("help", "Help") { _ ->
+            for (command in commandManager.commands) {
+                echo("${command.name}: ${command.description}")
             }
         })
     }
